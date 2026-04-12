@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NEXON Face Enrollment</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0e1a; color: #e8eaf6;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 20px;
+  }
+  .card {
+    background: #131829; border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 16px; padding: 32px; width: 460px;
+    box-shadow: 0 0 40px rgba(0,212,255,0.1);
+  }
+  h1 { font-size: 20px; color: #00d4ff; letter-spacing: 3px; margin-bottom: 4px; }
+  .sub { font-size: 12px; color: #3d4a7a; letter-spacing: 1px; margin-bottom: 24px; }
+  label { font-size: 11px; color: #7986cb; letter-spacing: 1px; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  input, select {
+    width: 100%; background: #0d1224; border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 8px; color: #e8eaf6; font-size: 13px;
+    padding: 10px 14px; outline: none; margin-bottom: 16px;
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus { border-color: #00d4ff; }
+  .video-wrap {
+    position: relative; width: 100%; aspect-ratio: 4/3;
+    background: #000; border-radius: 10px; overflow: hidden;
+    margin-bottom: 16px; border: 1px solid rgba(0,212,255,0.2);
+  }
+  video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  canvas { pointer-events: none; }
+  .overlay-text {
+    position: absolute; bottom: 10px; left: 0; right: 0;
+    text-align: center; font-size: 11px; color: rgba(0,212,255,0.8);
+    letter-spacing: 1px;
+  }
+  .btn-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  button {
+    flex: 1; padding: 11px; border-radius: 8px; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: all 0.2s; border: none;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #00d4ff, #8a2be2);
+    color: #fff; box-shadow: 0 0 20px rgba(0,212,255,0.3);
+  }
+  .btn-primary:hover { transform: scale(1.02); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-secondary { background: #1a2040; color: #7986cb; border: 1px solid rgba(0,212,255,0.2); }
+  .btn-secondary:hover { border-color: #00d4ff; color: #00d4ff; }
+  .btn-danger { background: rgba(255,0,102,0.15); color: #ff0066; border: 1px solid rgba(255,0,102,0.3); }
+  .status {
+    background: #0d1224; border-radius: 8px; padding: 12px 14px;
+    font-size: 12px; line-height: 1.6; min-height: 60px;
+    border: 1px solid rgba(0,212,255,0.1); margin-bottom: 16px;
+    white-space: pre-line;
+  }
+  .samples { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .sample-img {
+    width: 60px; height: 45px; border-radius: 6px; object-fit: cover;
+    border: 2px solid rgba(0,255,136,0.5);
+  }
+  .progress { height: 4px; background: #1a2040; border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #00d4ff, #00ff88); border-radius: 2px; transition: width 0.4s; }
+  .profiles-list { margin-top: 8px; }
+  .profile-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; background: #0d1224; border-radius: 8px;
+    margin-bottom: 6px; font-size: 12px;
+  }
+  .profile-name { color: #00d4ff; font-weight: 600; }
+  .profile-meta { color: #3d4a7a; font-size: 10px; }
+  .btn-small {
+    padding: 4px 10px; font-size: 10px; border-radius: 4px;
+    background: rgba(0,212,255,0.1); color: #00d4ff;
+    border: 1px solid rgba(0,212,255,0.3); cursor: pointer;
+  }
+  .section-title { font-size: 11px; color: #3d4a7a; letter-spacing: 2px; text-transform: uppercase; margin: 20px 0 10px; }
+  .success { color: #00ff88; }
+  .error   { color: #ff0066; }
+  .info    { color: #00d4ff; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>⬡ NEXON</h1>
+  <div class="sub">BIOMETRIC FACE ENROLLMENT</div>
+
+  <!-- Profile creation -->
+  <label>Your Name</label>
+  <input type="text" id="name-input" placeholder="Enter your name" value="" />
+
+  <label>Avatar Emoji</label>
+  <input type="text" id="avatar-input" value="👤" style="width:80px;display:inline-block;margin-right:8px;" maxlength="2" />
+  <select id="avatar-select" style="width:calc(100% - 90px);display:inline-block;" onchange="document.getElementById('avatar-input').value=this.value">
+    <option value="👤">👤 Default</option>
+    <option value="😎">😎 Cool</option>
+    <option value="🧑‍💻">🧑‍💻 Developer</option>
+    <option value="👨‍🎓">👨‍🎓 Student</option>
+    <option value="👩‍💼">👩‍💼 Professional</option>
+    <option value="🦸">🦸 Hero</option>
+  </select>
+
+  <!-- Camera feed -->
+  <div class="video-wrap">
+    <video id="cam" autoplay muted playsinline style="transform:scaleX(-1)"></video>
+    <canvas id="overlay"></canvas>
+    <div class="overlay-text" id="cam-hint">Starting camera…</div>
+  </div>
+
+  <!-- Progress -->
+  <div style="display:flex;justify-content:space-between;font-size:11px;color:#7986cb;margin-bottom:4px;">
+    <span>Face samples</span>
+    <span id="sample-count">0 / 5</span>
+  </div>
+  <div class="progress"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+
+  <!-- Captured sample thumbnails -->
+  <div class="samples" id="samples"></div>
+
+  <!-- Buttons -->
+  <div class="btn-row">
+    <button class="btn-primary" id="capture-btn" onclick="captureSample()" disabled>📸 Capture Sample</button>
+    <button class="btn-secondary" onclick="resetSamples()">🔄 Reset</button>
+  </div>
+
+  <button class="btn-primary" id="enroll-btn" onclick="enrollFace()" disabled style="width:100%;margin-bottom:12px;">
+    ✅ Enroll Face & Create Profile
+  </button>
+
+  <!-- Status -->
+  <div class="status" id="status">Ready. Enter your name, then capture 5 face samples from different angles.</div>
+
+  <!-- Existing profiles -->
+  <div class="section-title">Existing profiles</div>
+  <div class="profiles-list" id="profiles-list">Loading…</div>
+
+  <div class="btn-row" style="margin-top:12px;">
+    <button class="btn-secondary" onclick="loadProfiles()">🔄 Refresh Profiles</button>
+    <button class="btn-secondary" onclick="testRecognition()">🔍 Test Recognition</button>
+  </div>
+</div>
+
+<script>
+const BACKEND = 'http://127.0.0.1:8000';
+let stream    = null;
+let samples   = [];     // Array of Blob objects
+let createdUserId = null;
+
+// ── Start Camera ──────────────────────────────────────────────
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480, facingMode: 'user' }
+    });
+    const video = document.getElementById('cam');
+    video.srcObject = stream;
+    await new Promise(r => video.onloadedmetadata = r);
+    document.getElementById('cam-hint').textContent = 'Camera active — look at screen';
+    document.getElementById('capture-btn').disabled = false;
+    setStatus('info', 'Camera ready!\n\nStep 1: Enter your name above\nStep 2: Capture 5 samples (different angles)\nStep 3: Click Enroll');
+  } catch (e) {
+    setStatus('error', `Camera error: ${e.message}\n\nMake sure to allow camera access in browser.`);
+  }
+}
+
+// ── Capture Sample ────────────────────────────────────────────
+async function captureSample() {
+  if (samples.length >= 5) {
+    setStatus('info', 'Already have 5 samples. Click Enroll or Reset to recapture.');
+    return;
+  }
+
+  const video  = document.getElementById('cam');
+  const canvas = document.createElement('canvas');
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx    = canvas.getContext('2d');
+  // Mirror to match video display
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, -canvas.width, 0);
+
+  // Convert to blob
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+  samples.push(blob);
+
+  // Show thumbnail
+  const img   = document.createElement('img');
+  img.src     = URL.createObjectURL(blob);
+  img.className = 'sample-img';
+  document.getElementById('samples').appendChild(img);
+
+  // Update progress
+  const count = samples.length;
+  document.getElementById('sample-count').textContent = `${count} / 5`;
+  document.getElementById('prog').style.width = `${count * 20}%`;
+
+  const hints = ['', 'Turn slightly left', 'Turn slightly right', 'Tilt head up', 'Tilt head down', 'All samples captured! ✓'];
+  setStatus('success', `Sample ${count} captured!\n${hints[count]}`);
+
+  if (count >= 3) {
+    document.getElementById('enroll-btn').disabled = false;
+  }
+  if (count >= 5) {
+    document.getElementById('capture-btn').disabled = true;
+  }
+}
+
+function resetSamples() {
+  samples = [];
+  document.getElementById('samples').innerHTML = '';
+  document.getElementById('sample-count').textContent = '0 / 5';
+  document.getElementById('prog').style.width = '0%';
+  document.getElementById('capture-btn').disabled = false;
+  document.getElementById('enroll-btn').disabled = true;
+  setStatus('info', 'Reset. Capture 5 new samples.');
+}
+
+// ── Enroll Face ───────────────────────────────────────────────
+async function enrollFace() {
+  const name   = document.getElementById('name-input').value.trim();
+  const avatar = document.getElementById('avatar-input').value.trim() || '👤';
+
+  if (!name) {
+    setStatus('error', 'Please enter your name first!');
+    return;
+  }
+  if (samples.length < 3) {
+    setStatus('error', 'Capture at least 3 face samples first.');
+    return;
+  }
+
+  setStatus('info', 'Creating profile…');
+  document.getElementById('enroll-btn').disabled = true;
+
+  try {
+    // Step 1: Create profile
+    let userId = createdUserId;
+    if (!userId) {
+      const profileResp = await fetch(`${BACKEND}/auth/profiles`, {
+        method : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body   : JSON.stringify({ name, avatar })
+      });
+      const profileData = await profileResp.json();
+      userId = profileData.profile?.user_id;
+      createdUserId = userId;
+      setStatus('info', `Profile created for ${name} (ID: ${userId})\nEnrolling face samples…`);
+    }
+
+    // Step 2: Enroll each face sample
+    let enrolled = 0;
+    for (let i = 0; i < samples.length; i++) {
+      setStatus('info', `Enrolling sample ${i+1} of ${samples.length}…`);
+      const formData = new FormData();
+      formData.append('image', samples[i], `face_${i}.jpg`);
+      formData.append('user_id', userId);
+
+      const resp = await fetch(`${BACKEND}/auth/enroll`, {
+        method: 'POST',
+        body  : formData
+      });
+      const data = await resp.json();
+
+      if (data.success) {
+        enrolled++;
+      } else if (data.message?.includes('No face')) {
+        setStatus('error', `Sample ${i+1} had no detectable face. Try better lighting.`);
+      }
+    }
+
+    if (enrolled > 0) {
+      setStatus('success',
+        `✅ Success! Enrolled ${enrolled} face samples for "${name}"\n\n` +
+        `Profile ID: ${userId}\n` +
+        `NEXON will now recognize you automatically when you open the app.\n\n` +
+        `Your personal memory and style preferences are linked to this profile.`
+      );
+      loadProfiles();
+    } else {
+      setStatus('error', 'No samples could be enrolled. Make sure your face is clearly visible.');
+    }
+
+  } catch (e) {
+    setStatus('error', `Enrollment failed: ${e.message}\n\nMake sure NEXON backend is running at localhost:8000`);
+  } finally {
+    document.getElementById('enroll-btn').disabled = false;
+  }
+}
+
+// ── Test Recognition ──────────────────────────────────────────
+async function testRecognition() {
+  if (!stream) { setStatus('error', 'Camera not active.'); return; }
+
+  setStatus('info', 'Testing recognition…');
+  const video  = document.getElementById('cam');
+  const canvas = document.createElement('canvas');
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx    = canvas.getContext('2d');
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, -canvas.width, 0);
+
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+  const formData = new FormData();
+  formData.append('image', blob, 'test.jpg');
+
+  try {
+    const resp = await fetch(`${BACKEND}/auth/recognize`, { method: 'POST', body: formData });
+    const data = await resp.json();
+
+    if (data.recognized) {
+      setStatus('success',
+        `✅ Recognized: ${data.profile?.name || data.user_id}\n` +
+        `Confidence: ${Math.round(data.confidence * 100)}%\n` +
+        `Profile ID: ${data.user_id}`
+      );
+    } else {
+      setStatus('error', `❌ Not recognized\n\nMake sure you enrolled your face first.\nTry better lighting or capture more samples.`);
+    }
+  } catch (e) {
+    setStatus('error', `Recognition test failed: ${e.message}`);
+  }
+}
+
+// ── Load Profiles ─────────────────────────────────────────────
+async function loadProfiles() {
+  const list = document.getElementById('profiles-list');
+  try {
+    const resp  = await fetch(`${BACKEND}/auth/profiles`);
+    const data  = await resp.json();
+    const profs = data.profiles || [];
+
+    if (!profs.length) {
+      list.innerHTML = '<div style="color:#3d4a7a;font-size:12px;padding:8px;">No profiles yet.</div>';
+      return;
+    }
+
+    list.innerHTML = profs.map(p => `
+      <div class="profile-item">
+        <div>
+          <span style="font-size:18px;margin-right:8px;">${p.avatar || '👤'}</span>
+          <span class="profile-name">${p.name}</span>
+          <div class="profile-meta">${p.user_id} · ${p.face_enrolled ? '✅ Face enrolled' : '⚠️ No face enrolled'} · Logins: ${p.login_count || 0}</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-small" onclick="switchToProfile('${p.user_id}')">Activate</button>
+          ${p.user_id !== 'default' ? `<button class="btn-small" style="color:#ff0066;border-color:rgba(255,0,102,0.3);" onclick="deleteProfile('${p.user_id}')">Delete</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = `<div style="color:#ff0066;font-size:12px;padding:8px;">Could not load profiles: ${e.message}</div>`;
+  }
+}
+
+async function switchToProfile(userId) {
+  try {
+    await fetch(`${BACKEND}/auth/switch/${userId}`, { method: 'POST' });
+    setStatus('success', `✅ Switched to profile: ${userId}`);
+    loadProfiles();
+  } catch (e) {
+    setStatus('error', `Switch failed: ${e.message}`);
+  }
+}
+
+async function deleteProfile(userId) {
+  if (!confirm(`Delete profile ${userId}? This cannot be undone.`)) return;
+  try {
+    await fetch(`${BACKEND}/auth/profiles/${userId}`, { method: 'DELETE' });
+    setStatus('info', `Profile ${userId} deleted.`);
+    loadProfiles();
+  } catch (e) {
+    setStatus('error', `Delete failed: ${e.message}`);
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function setStatus(type, msg) {
+  const el = document.getElementById('status');
+  el.className  = `status ${type}`;
+  el.textContent = msg;
+}
+
+// ── Init ──────────────────────────────────────────────────────
+startCamera();
+loadProfiles();
+</script>
+</body>
+</html>

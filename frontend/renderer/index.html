@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:
+                 https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;"
+    />
+    <title>NEXON — AI Operating System v2</title>
+    <link rel="stylesheet" href="styles.css" />
+
+    <!-- MediaPipe — versioned for reliability -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
+      crossorigin="anonymous"
+    ></script>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <!-- ══════════════════════════════════════════════════════
+       TITLE BAR
+       ══════════════════════════════════════════════════════ -->
+      <div id="titlebar">
+        <div id="titlebar-drag">
+          <span id="nexon-logo">⬡ NEXON</span>
+          <span id="nexon-version">v2.0 — AI OS</span>
+        </div>
+
+        <!-- Language Toggle -->
+        <div id="language-toggle">
+          <button class="lang-btn active" data-lang="en">EN</button>
+          <button class="lang-btn" data-lang="hi">HI</button>
+          <button class="lang-btn" data-lang="hinglish">MIX</button>
+        </div>
+
+        <!-- Live emotion context indicator -->
+        <div id="emotion-context-pill">
+          <span id="emotion-context-icon">😐</span>
+          <span id="emotion-context-label">NEUTRAL</span>
+          <span id="emotion-context-hint">sent with prompts</span>
+        </div>
+
+        <!-- Memory stats -->
+        <div
+          id="memory-pill"
+          title="Long-term memory"
+          onclick="renderer_toggleMemoryPanel()"
+        >
+          <span>🧠</span>
+          <span id="memory-pill-count">0 memories</span>
+        </div>
+
+        <!-- Active user profile -->
+        <div id="user-profile-pill" title="Active user profile">
+          <span id="user-avatar">👤</span>
+          <span id="user-name">User</span>
+        </div>
+
+        <!-- Theme Toggle -->
+        <button
+          id="theme-toggle-btn"
+          onclick="toggleTheme()"
+          title="Toggle Dark/Light Mode"
+          style="-webkit-app-region: no-drag"
+        >
+          ☀️
+        </button>
+
+        <!-- Connection status -->
+        <div id="connection-status">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">Connecting…</span>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════
+       MAIN RESIZABLE THREE-PANEL LAYOUT
+       ══════════════════════════════════════════════════════ -->
+      <div id="main-grid">
+        <!-- ════════════════════════════════════════════════
+         LEFT PANEL
+         ════════════════════════════════════════════════ -->
+        <aside id="left-panel" class="panel">
+          <!-- Camera Section -->
+          <div id="camera-section">
+            <div id="camera-header">
+              <span class="panel-label">📷 CAMERA</span>
+              <div style="display: flex; gap: 5px; align-items: center">
+                <span id="face-badge" class="badge badge-gray">No Face</span>
+                <!-- Gaze toggle button -->
+                <button
+                  id="gaze-toggle-btn"
+                  class="icon-btn"
+                  title="Toggle gaze tracking"
+                  onclick="gazeTracker?.toggle()"
+                >
+                  👁
+                </button>
+                <button
+                  id="camera-toggle-btn"
+                  class="icon-btn"
+                  title="Toggle camera"
+                  onclick="renderer_toggleCamera()"
+                >
+                  📷
+                </button>
+              </div>
+            </div>
+
+            <!-- Camera + avatar side by side -->
+            <div id="camera-avatar-row">
+              <div id="camera-container">
+                <video id="camera-video" autoplay muted playsinline></video>
+                <canvas id="camera-canvas"></canvas>
+                <div id="camera-status-overlay">
+                  <span id="camera-status-text">Initializing…</span>
+                </div>
+              </div>
+              <!-- Emotion mirror avatar (new!) -->
+              <div id="avatar-container" title="Emotion mirror avatar">
+                <canvas id="avatar-canvas" width="120" height="120"></canvas>
+                <div id="avatar-label">MIRROR</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Perception Cards -->
+          <div id="perception-cards">
+            <div class="perception-card" id="emotion-card">
+              <div class="card-label">EMOTION</div>
+              <div class="card-emoji" id="emotion-emoji">😐</div>
+              <div class="card-name" id="emotion-name">NEUTRAL</div>
+              <div class="card-conf" id="emotion-conf">—</div>
+              <div class="card-pulse" id="emotion-pulse"></div>
+            </div>
+            <div class="perception-card" id="gesture-card">
+              <div class="card-label">GESTURE</div>
+              <div class="card-emoji" id="gesture-emoji">🖐️</div>
+              <div class="card-name" id="gesture-name">NO GESTURE</div>
+              <div class="card-conf" id="gesture-conf">—</div>
+              <div class="card-pulse" id="gesture-pulse"></div>
+            </div>
+          </div>
+
+          <!-- Voice Stress Bar -->
+          <div id="voice-stress-bar">
+            <div id="vsb-header">
+              <span class="panel-label" style="font-size: 9px"
+                >VOICE STRESS</span
+              >
+              <span id="vsb-value">0%</span>
+            </div>
+            <div id="vsb-track">
+              <div id="vsb-fill"></div>
+            </div>
+            <div id="vsb-emotion">calm</div>
+          </div>
+
+          <!-- Voice Tone Pills -->
+          <div id="voice-emotion-bar">
+            <span class="panel-label" style="font-size: 9px">VOICE TONE</span>
+            <div id="voice-tone-pills">
+              <span class="tone-pill active" data-tone="neutral">Neutral</span>
+              <span class="tone-pill" data-tone="happy">Happy</span>
+              <span class="tone-pill" data-tone="stressed">Stressed</span>
+              <span class="tone-pill" data-tone="excited">Excited</span>
+            </div>
+          </div>
+
+          <!-- Predictive Suggestions (new!) -->
+          <div id="suggestions-section">
+            <div
+              class="panel-label"
+              style="font-size: 9px; padding: 6px 10px 2px"
+            >
+              🔮 NEXON SUGGESTS
+            </div>
+            <div id="suggestions-list">
+              <!-- Populated by renderer.js -->
+            </div>
+          </div>
+
+          <!-- History Section -->
+          <div id="history-section">
+            <div id="history-header">
+              <span class="panel-label">📚 HISTORY</span>
+              <button id="new-chat-btn-left" class="icon-btn" title="New Chat">
+                ＋
+              </button>
+            </div>
+            <div id="history-list"></div>
+          </div>
+        </aside>
+
+        <!-- Left resize handle -->
+        <div class="resize-handle" id="handle-left" data-direction="left"></div>
+
+        <!-- ════════════════════════════════════════════════
+         CENTER PANEL
+         ════════════════════════════════════════════════ -->
+        <main id="center-panel" class="panel">
+          <div id="center-top">
+            <div id="nexon-title-center">
+              <span class="gradient-text">NEXON</span>
+              <span id="center-subtitle">Agentic AI OS v2</span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center">
+              <!-- Gaze calibrate button -->
+              <button
+                class="icon-btn"
+                title="Calibrate gaze tracking"
+                onclick="gazeTracker?.calibrate()"
+                style="font-size: 10px; width: auto; padding: 0 8px"
+              >
+                👁 Calibrate
+              </button>
+              <div id="model-info">
+                <span id="model-label">⚡</span>
+                <span id="model-name">Loading…</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Neural Sphere -->
+          <div id="sphere-container">
+            <canvas id="sphere-canvas"></canvas>
+            <div id="mic-wrapper">
+              <button id="mic-btn" class="mic-button" title="Click to speak">
+                <span id="mic-icon">🎙️</span>
+              </button>
+              <div id="mic-label">TAP TO SPEAK</div>
+            </div>
+            <!-- Emotion badge on sphere -->
+            <div id="sphere-emotion-badge">
+              <span id="sphere-emotion-icon">😐</span>
+              <span id="sphere-emotion-text">Neutral context active</span>
+            </div>
+          </div>
+
+          <!-- Waveform -->
+          <div id="waveform-container">
+            <canvas id="waveform-canvas"></canvas>
+            <div id="waveform-label">AMBIENT</div>
+          </div>
+
+          <!-- Parallel Task Dashboard (new!) -->
+          <div id="parallel-dashboard" style="display: none">
+            <!-- Populated by parallel.js -->
+          </div>
+
+          <!-- Memory Panel (new! — slides up from bottom) -->
+          <div id="memory-panel" class="slide-panel" style="display: none">
+            <div id="mp-header">
+              <span class="panel-label">🧠 LONG-TERM MEMORY</span>
+              <div style="display: flex; gap: 6px">
+                <input
+                  type="text"
+                  id="mp-search"
+                  placeholder="Search memories…"
+                />
+                <button class="icon-btn" onclick="renderer_searchMemory()">
+                  🔍
+                </button>
+                <button class="icon-btn" onclick="renderer_toggleMemoryPanel()">
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div id="mp-list"></div>
+          </div>
+
+          <!-- Status Bar -->
+          <div id="status-bar">
+            <div class="stat-item">
+              <span class="stat-key">MEMORY</span>
+              <span class="stat-val" id="stat-memory">—</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-key">DEVICE</span>
+              <span class="stat-val" id="stat-device">LOCAL</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-key">MODEL</span>
+              <span class="stat-val" id="stat-model">—</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-key">COMMANDS</span>
+              <span class="stat-val" id="stat-commands">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-key">EMOTION</span>
+              <span class="stat-val" id="stat-emotion">NEUTRAL</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-key">STRESS</span>
+              <span class="stat-val" id="stat-stress">0%</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-key">TRANSCRIPT</span>
+              <span class="stat-val" id="stat-transcript">—</span>
+            </div>
+          </div>
+        </main>
+
+        <!-- Right resize handle -->
+        <div
+          class="resize-handle"
+          id="handle-right"
+          data-direction="right"
+        ></div>
+
+        <!-- ════════════════════════════════════════════════
+         RIGHT PANEL
+         ════════════════════════════════════════════════ -->
+        <section id="right-panel" class="panel">
+          <div id="chat-header">
+            <span id="chat-title">💬 CURRENT CHAT</span>
+            <div style="display: flex; gap: 5px; align-items: center">
+              <div id="chat-emotion-indicator" title="Emotion being sent">
+                <span id="chat-emotion-icon">😐</span>
+                <span id="chat-emotion-text">neutral</span>
+              </div>
+              <!-- Personality button (new!) -->
+              <button
+                class="icon-btn"
+                title="View your style profile"
+                onclick="renderer_showStyleProfile()"
+                style="font-size: 10px"
+              >
+                🎭
+              </button>
+              <!-- Gesture macros button (new!) -->
+              <button
+                class="icon-btn"
+                title="Manage gesture macros"
+                onclick="renderer_showMacros()"
+                style="font-size: 10px"
+              >
+                🕹️
+              </button>
+              <button id="new-chat-btn-right" class="icon-btn" title="New Chat">
+                ＋
+              </button>
+            </div>
+          </div>
+
+          <!-- Chat Messages -->
+          <div id="chat-messages" role="log" aria-live="polite">
+            <div class="message-row assistant-row" id="welcome-msg">
+              <div class="msg-avatar">🤖</div>
+              <div class="msg-bubble assistant-bubble">
+                <div class="msg-text">
+                  👋 <strong>NEXON v2</strong> — Now with:<br /><br />
+                  🧠 <strong>Long-term memory</strong> — I remember across
+                  sessions<br />
+                  🔮 <strong>Predictive AI</strong> — I suggest before you
+                  ask<br />
+                  ⚡ <strong>Parallel agents</strong> — Multiple tasks at
+                  once<br />
+                  👁 <strong>Gaze control</strong> — Look at buttons to
+                  activate<br />
+                  🎭 <strong>Style learning</strong> — I adapt to how you
+                  communicate<br />
+                  🔊 <strong>Voice stress</strong> — I detect if you're
+                  stressed<br /><br />
+                  Try:
+                  <em
+                    >"Send email to John AND book a meeting tomorrow AND take a
+                    screenshot"</em
+                  >
+                </div>
+                <div class="msg-time">Just now</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat Input -->
+          <div id="chat-input-area">
+            <!-- Emotion + voice stress context strip -->
+            <div id="emotion-context-strip">
+              <span id="ecs-icon">😐</span>
+              <span id="ecs-label"
+                >Sending with <strong id="ecs-emotion">neutral</strong></span
+              >
+              <span id="ecs-stress"></span>
+              <span id="ecs-gesture-label"></span>
+              <span
+                id="ecs-memory-hint"
+                style="
+                  margin-left: auto;
+                  font-size: 9px;
+                  color: var(--text-muted);
+                "
+              ></span>
+            </div>
+
+            <!-- Mode Selector -->
+            <div id="mode-selector">
+              <button class="mode-btn active" data-mode="text">✏️ Text</button>
+              <button class="mode-btn" data-mode="voice">🎙️ Voice</button>
+              <button class="mode-btn" data-mode="hybrid">⚡ Hybrid</button>
+            </div>
+
+            <!-- Input Row -->
+            <div id="input-row">
+              <button id="attach-btn" class="icon-btn" title="Attach file">
+                📎
+              </button>
+              <button
+                id="screen-btn"
+                class="icon-btn"
+                title="Read screen"
+                onclick="renderer_readScreen()"
+              >
+                🖥️
+              </button>
+              <input
+                type="text"
+                id="chat-input"
+                placeholder="Message NEXON… (Enter to send)"
+                autocomplete="off"
+              />
+              <button id="send-btn" class="send-btn" title="Send">➤</button>
+            </div>
+          </div>
+        </section>
+      </div>
+      <!-- /#main-grid -->
+    </div>
+    <!-- /#app -->
+
+    <!-- Toast -->
+    <div id="toast-container"></div>
+
+    <!-- Loading overlay -->
+    <div id="loading-overlay">
+      <div id="loading-content">
+        <div id="loading-sphere-placeholder">⬡</div>
+        <div id="loading-text">NEXON v2 Initializing…</div>
+        <div id="loading-sub">Loading all AI features</div>
+      </div>
+    </div>
+
+    <!-- JS — load order matters -->
+    <script src="tts_engine.js"></script>
+    <script src="sphere.js"></script>
+    <script src="waveform.js"></script>
+    <script src="recorder.js"></script>
+    <script src="gaze.js"></script>
+    <script src="avatar.js"></script>
+    <script src="parallel.js"></script>
+    <script src="camera.js"></script>
+    <script src="renderer.js"></script>
+  </body>
+</html>

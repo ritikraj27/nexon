@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:;"/>
+<title>NEXON — Identity</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#0a0e1a;color:#e8eaf6;
+  font-family:'Segoe UI',system-ui,sans-serif;
+  display:flex;align-items:center;justify-content:center;
+  height:100vh;overflow:hidden;
+  -webkit-app-region:drag;
+}
+.card{width:440px;text-align:center;-webkit-app-region:no-drag;padding:20px;}
+.logo{font-size:36px;color:#00d4ff;letter-spacing:6px;font-weight:800;margin-bottom:4px;text-shadow:0 0 30px rgba(0,212,255,0.4);}
+.sub{font-size:10px;letter-spacing:3px;color:#3d4a7a;margin-bottom:24px;}
+
+.cam-outer{position:relative;width:200px;height:200px;margin:0 auto 18px;}
+.cam-wrap{width:200px;height:200px;border-radius:50%;overflow:hidden;border:2px solid rgba(0,212,255,0.25);box-shadow:0 0 30px rgba(0,212,255,0.1);}
+video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block;}
+
+.scan-ring{
+  position:absolute;top:-4px;left:-4px;right:-4px;bottom:-4px;
+  border-radius:50%;border:2.5px solid transparent;
+  border-top-color:#00d4ff;
+  animation:spin 1.4s linear infinite;pointer-events:none;
+}
+.scan-ring.success{border-color:#00ff88;animation:none;}
+.scan-ring.fail   {border-color:#ff6b6b;animation:none;}
+.scan-ring.stopped{animation-play-state:paused;opacity:0.3;}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+
+.dots{display:flex;gap:7px;justify-content:center;margin:12px 0 8px;}
+.dot{width:8px;height:8px;border-radius:50%;background:#1a2040;transition:all 0.3s;}
+.dot.active{background:#00d4ff;box-shadow:0 0 8px rgba(0,212,255,0.6);}
+.dot.done  {background:#00ff88;box-shadow:0 0 6px rgba(0,255,136,0.5);}
+.dot.fail  {background:#ff6b6b;}
+
+.status-main{font-size:14px;color:#e8eaf6;margin-bottom:4px;min-height:22px;font-weight:500;}
+.status-sub {font-size:11px;color:#4a5880;margin-bottom:18px;min-height:16px;}
+
+.user-card{
+  display:none;flex-direction:column;align-items:center;gap:4px;
+  background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.2);
+  border-radius:12px;padding:12px 24px;margin:0 auto 16px;
+  width:fit-content;
+}
+.user-avatar{font-size:36px;}
+.user-name  {font-size:17px;font-weight:700;color:#00d4ff;}
+.user-conf  {font-size:11px;color:#3d4a7a;}
+
+.btn-row{display:flex;gap:10px;justify-content:center;margin-bottom:10px;}
+button{padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.18s;border:none;}
+.btn-primary{background:linear-gradient(135deg,#00d4ff,#8a2be2);color:#fff;box-shadow:0 0 18px rgba(0,212,255,0.25);}
+.btn-primary:hover{transform:scale(1.04);}
+.btn-secondary{background:rgba(0,212,255,0.07);color:#7986cb;border:1px solid rgba(0,212,255,0.2);}
+.btn-secondary:hover{border-color:#00d4ff;color:#00d4ff;}
+.btn-ghost{background:transparent;color:#3d4a7a;border:1px solid rgba(255,255,255,0.08);font-size:11px;padding:7px 16px;border-radius:8px;}
+.btn-ghost:hover{color:#7986cb;border-color:rgba(255,255,255,0.2);}
+
+.progress-bar{height:3px;background:#1a2040;border-radius:2px;margin:0 0 18px;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,#00d4ff,#00ff88);width:0%;transition:width 0.4s ease;border-radius:2px;}
+
+.hint{font-size:10px;color:#2a3560;margin-top:6px;letter-spacing:0.5px;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">⬡ NEXON</div>
+  <div class="sub">IDENTITY VERIFICATION</div>
+
+  <div class="cam-outer">
+    <div class="cam-wrap"><video id="cam" autoplay muted playsinline></video></div>
+    <div class="scan-ring" id="scan-ring"></div>
+  </div>
+
+  <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+  <div class="dots">
+    <div class="dot active" id="d1"></div>
+    <div class="dot"        id="d2"></div>
+    <div class="dot"        id="d3"></div>
+  </div>
+
+  <div class="status-main" id="status-main">Initializing camera…</div>
+  <div class="status-sub"  id="status-sub">Please look at the camera</div>
+
+  <div class="user-card" id="user-card">
+    <div class="user-avatar" id="user-avatar">👤</div>
+    <div class="user-name"   id="user-name">Welcome!</div>
+    <div class="user-conf"   id="user-conf">Confidence: —</div>
+  </div>
+
+  <div class="btn-row" id="btn-row" style="display:none;"></div>
+
+  <div style="margin-top:8px;">
+    <button class="btn-ghost" onclick="goAsGuest()">Continue as Guest →</button>
+  </div>
+
+  <div class="hint" id="hint">
+    Not enrolled yet? <span style="color:#00d4ff;cursor:pointer;" onclick="goAsGuest()">Open face_enrollment.html in Chrome</span> while backend is running.
+  </div>
+</div>
+
+<script>
+let stream     = null;
+let entered    = false;
+let recognized = null;
+const BACKEND  = 'http://127.0.0.1:8000';
+
+const ui = {
+  main    : document.getElementById('status-main'),
+  sub     : document.getElementById('status-sub'),
+  ring    : document.getElementById('scan-ring'),
+  progress: document.getElementById('progress'),
+  userCard: document.getElementById('user-card'),
+  btnRow  : document.getElementById('btn-row'),
+};
+
+function setStatus(main, sub='') {
+  ui.main.textContent = main;
+  ui.sub.textContent  = sub;
+}
+function setDot(n, state) {
+  const d=document.getElementById(`d${n}`);
+  if(!d)return;
+  d.className='dot '+(state==='active'?'active':state==='done'?'done':state==='fail'?'fail':'');
+}
+function setProgress(pct) { ui.progress.style.width=`${pct}%`; }
+
+async function init() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { width:400, height:400, facingMode:'user', frameRate:15 }
+    });
+    document.getElementById('cam').srcObject = stream;
+    await new Promise(r => { document.getElementById('cam').onloadedmetadata = r; });
+    await new Promise(r => setTimeout(r, 800)); // Let camera warm up
+
+    // Check if there are enrolled profiles
+    const profilesResp = await fetch(`${BACKEND}/auth/profiles`);
+    const profilesData = await profilesResp.json();
+    const profiles     = (profilesData.profiles||[]).filter(p => p.user_id!=='default' && p.face_enrolled);
+
+    if (profiles.length === 0) {
+      // No enrolled faces — show setup option
+      onNoProfiles();
+      return;
+    }
+
+    setStatus('Scanning your face…', 'Hold still — 3 attempts');
+    setDot(2, 'active');
+    setProgress(30);
+    await startScanning();
+
+  } catch(e) {
+    setStatus('Camera unavailable', e.message);
+    ui.ring.className='scan-ring fail';
+    showGuestOnly();
+  }
+}
+
+async function startScanning() {
+  const MAX_ATTEMPTS = 4;
+  let bestResult = null;
+
+  for (let attempt=1; attempt<=MAX_ATTEMPTS; attempt++) {
+    setStatus(`Recognizing… (${attempt}/${MAX_ATTEMPTS})`, 'Hold still, look at camera');
+    setProgress(30 + attempt * 15);
+    await new Promise(r => setTimeout(r, 600));
+
+    try {
+      const imgBuffer = await captureHighQualityFrame();
+      if (!imgBuffer) continue;
+
+      const result = await sendToRecognize(imgBuffer);
+      console.log(`[Splash] Attempt ${attempt}:`, result);
+
+      if (result.recognized && result.confidence > 0.40) {
+        if (!bestResult || result.confidence > bestResult.confidence) {
+          bestResult = result;
+        }
+        if (result.confidence > 0.65) break; // Good enough, stop early
+      }
+    } catch(e) {
+      console.warn(`[Splash] Attempt ${attempt} failed:`, e.message);
+    }
+  }
+
+  if (bestResult && bestResult.confidence > 0.40) {
+    onRecognized(bestResult);
+  } else {
+    onNotRecognized();
+  }
+}
+
+async function captureHighQualityFrame() {
+  const video  = document.getElementById('cam');
+  if (!video || video.readyState < 2) return null;
+
+  const W = video.videoWidth || 400;
+  const H = video.videoHeight|| 400;
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = W;
+  canvas.height = H;
+  const ctx    = canvas.getContext('2d');
+
+  // Draw WITHOUT mirroring — face_recognition needs un-mirrored image
+  ctx.drawImage(video, 0, 0, W, H);
+
+  return new Promise(resolve => {
+    canvas.toBlob(blob => {
+      if (!blob) { resolve(null); return; }
+      blob.arrayBuffer().then(resolve).catch(() => resolve(null));
+    }, 'image/jpeg', 0.92);
+  });
+}
+
+async function sendToRecognize(imageBuffer) {
+  // Use Electron IPC if available
+  if (window.nexonAPI?.recognizeFace) {
+    return await window.nexonAPI.recognizeFace(imageBuffer);
+  }
+
+  // Fallback: direct fetch (for testing)
+  const buffer   = new Uint8Array(imageBuffer);
+  const boundary = `----NexonBoundary${Date.now()}`;
+  const CRLF     = '\r\n';
+
+  const parts = [
+    `--${boundary}${CRLF}`,
+    `Content-Disposition: form-data; name="image"; filename="face.jpg"${CRLF}`,
+    `Content-Type: image/jpeg${CRLF}${CRLF}`,
+  ].join('');
+
+  const bodyParts = [
+    new TextEncoder().encode(parts),
+    buffer,
+    new TextEncoder().encode(`${CRLF}--${boundary}--${CRLF}`),
+  ];
+  const totalLen = bodyParts.reduce((s,p)=>s+p.length,0);
+  const body     = new Uint8Array(totalLen);
+  let off=0; bodyParts.forEach(p=>{body.set(p,off);off+=p.length;});
+
+  const resp = await fetch(`${BACKEND}/auth/recognize`, {
+    method:'POST',
+    headers:{'Content-Type':`multipart/form-data; boundary=${boundary}`},
+    body: body.buffer,
+  });
+  return await resp.json();
+}
+
+function onRecognized(result) {
+  const profile = result.profile || {};
+  const name    = profile.name || result.user_id || 'User';
+  const conf    = Math.round((result.confidence||0) * 100);
+  const avatar  = profile.avatar || '👤';
+
+  recognized = { userId: result.user_id, name, avatar };
+
+  ui.ring.className = 'scan-ring success';
+  setDot(1,'done'); setDot(2,'done'); setDot(3,'done');
+  setProgress(100);
+  setStatus(`Welcome back, ${name}! ✓`, '');
+
+  document.getElementById('user-avatar').textContent = avatar;
+  document.getElementById('user-name').textContent   = name;
+  document.getElementById('user-conf').textContent   = `Face match: ${conf}%`;
+  ui.userCard.style.display = 'flex';
+
+  ui.btnRow.innerHTML = `
+    <button class="btn-primary" onclick="enterNexon()">Enter NEXON →</button>
+    <button class="btn-secondary" onclick="retryAuth()">Not me</button>
+  `;
+  ui.btnRow.style.display = 'flex';
+  document.getElementById('hint').style.display = 'none';
+
+  // Auto-enter if high confidence
+  if (conf >= 70) {
+    setStatus(`Welcome back, ${name}! ✓`, `Auto-entering (${conf}% confidence)…`);
+    setTimeout(enterNexon, 1800);
+  }
+}
+
+function onNotRecognized() {
+  ui.ring.className = 'scan-ring fail';
+  setDot(3,'fail');
+  setProgress(100);
+  setStatus('Face not recognized', 'You can retry or continue as guest');
+
+  ui.btnRow.innerHTML = `
+    <button class="btn-secondary" onclick="retryAuth()">🔄 Retry</button>
+    <button class="btn-primary"   onclick="goAsGuest()">Continue as Guest →</button>
+  `;
+  ui.btnRow.style.display = 'flex';
+}
+
+function onNoProfiles() {
+  ui.ring.className = 'scan-ring stopped';
+  setDot(1,'done'); setDot(2,'fail'); setDot(3,'fail');
+  setProgress(100);
+  setStatus('No face profiles found', 'Set up your identity or continue as guest');
+
+  ui.btnRow.innerHTML = `
+    <button class="btn-primary" onclick="goAsGuest()">Continue as Guest →</button>
+  `;
+  ui.btnRow.style.display = 'flex';
+  document.getElementById('hint').style.display = 'block';
+  document.getElementById('hint').style.color = '#7986cb';
+  document.getElementById('hint').textContent = 'To set up face recognition: open face_enrollment.html in Chrome while the NEXON backend is running.';
+}
+
+function showGuestOnly() {
+  ui.btnRow.innerHTML = `<button class="btn-primary" onclick="goAsGuest()">Continue as Guest →</button>`;
+  ui.btnRow.style.display = 'flex';
+}
+
+async function retryAuth() {
+  ui.ring.className = 'scan-ring';
+  ui.userCard.style.display = 'none';
+  ui.btnRow.style.display   = 'none';
+  setDot(1,'active'); setDot(2,''); setDot(3,'');
+  setProgress(0);
+  recognized = null;
+  setStatus('Retrying…', 'Hold still');
+  await new Promise(r => setTimeout(r, 400));
+  setDot(2,'active');
+  setProgress(30);
+  await startScanning();
+}
+
+async function enterNexon() {
+  if (entered) return;
+  entered = true;
+  stopCamera();
+  setStatus('Entering NEXON…', '');
+  if (window.nexonAPI?.biometricPassed) {
+    try { await window.nexonAPI.biometricPassed({ userId: recognized.userId, name: recognized.name }); }
+    catch(e) { console.error(e); }
+  }
+}
+
+async function goAsGuest() {
+  if (entered) return;
+  entered = true;
+  stopCamera();
+  if (window.nexonAPI?.biometricSkip) {
+    try { await window.nexonAPI.biometricSkip(); }
+    catch(e) { console.error(e); }
+  }
+}
+
+function stopCamera() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+}
+
+// Keyboard shortcut
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && recognized) enterNexon();
+  if (e.key === 'Escape') goAsGuest();
+});
+
+init();
+</script>
+</body>
+</html>
