@@ -74,32 +74,32 @@ SLACK_TOKEN=
 ---
 
 ## 📁 Project Structure
-
 nexon/
 ├── backend/
-│   ├── main.py              ← FastAPI server (all endpoints)
-│   ├── llm_engine.py        ← Ollama + Groq LLM wrapper
-│   ├── intent_parser.py     ← Intent classification + entity extraction
-│   ├── command_processor.py ← Orchestrates agent pipeline
-│   ├── config.py            ← All configuration
-│   ├── agents/              ← 10 specialized AI agents
-│   ├── speech/              ← Whisper STT + pyttsx3 TTS
-│   └── db/                  ← SQLite ORM (sessions, messages)
+│   ├── main.py              # FastAPI server (all endpoints)
+│   ├── llm_engine.py        # Ollama + Groq LLM wrapper
+│   ├── intent_parser.py     # Intent classification + entity extraction
+│   ├── command_processor.py # Orchestrates agent pipeline
+│   ├── config.py            # All configuration
+│   ├── agents/              # 10 specialized AI agents
+│   ├── speech/              # Whisper STT + pyttsx3 TTS
+│   └── db/                  # SQLite ORM (sessions, messages)
 ├── frontend/
 │   ├── electron/
-│   │   ├── main.js          ← Electron main process + IPC
-│   │   └── preload.js       ← Secure renderer bridge
+│   │   ├── main.js          # Electron main process + IPC
+│   │   └── preload.js       # Secure renderer bridge
 │   └── renderer/
-│       ├── index.html       ← Full 3-column NEXON UI
-│       ├── styles.css       ← Futuristic dark theme
-│       ├── renderer.js      ← Main UI orchestrator
-│       ├── sphere.js        ← Three.js neural sphere
-│       ├── waveform.js      ← Audio waveform visualizer
-│       ├── recorder.js      ← Voice capture + VAD
-│       └── camera.js        ← Face mesh + gesture detection
+│       ├── index.html       # Full 3-column NEXON UI
+│       ├── styles.css       # Futuristic dark theme
+│       ├── renderer.js      # Main UI orchestrator
+│       ├── sphere.js        # Three.js neural sphere
+│       ├── waveform.js      # Audio waveform visualizer
+│       ├── recorder.js      # Voice capture + VAD
+│       └── camera.js        # Face mesh + gesture detection
 ├── requirements.txt
 ├── package.json
 └── README.md
+
 
 ---
 
