@@ -74,6 +74,8 @@ SLACK_TOKEN=
 ---
 
 ## 📁 Project Structure
+
+```
 nexon/
 ├── backend/
 │   ├── main.py              # FastAPI server (all endpoints)
@@ -99,9 +101,8 @@ nexon/
 ├── requirements.txt
 ├── package.json
 └── README.md
+```
 
-
----
 
 ## 🎙️ Voice Commands (examples)
 
